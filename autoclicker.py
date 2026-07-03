@@ -4,17 +4,19 @@ from pynput.mouse import Controller, Button
 from pynput.keyboard import Key, Listener
 import threading
 import time
+import sys
 
 class AutoClicker:
     def __init__(self):
         self.running = False
         self.mouse = Controller()
-        self.click_speed = 0.01  # Very fast clicking (10ms between clicks)
+        self.click_speed = 0.01
         self.target_x = None
         self.target_y = None
         self.use_current_position = True
-        self.keys_to_press = ['button1']  # Default: left mouse button
+        self.keys_to_press = ['a']
         self.listener = None
+        self.click_thread = None
         
     def set_click_speed(self, speed):
         """Set clicking speed in seconds between clicks"""
@@ -33,10 +35,7 @@ class AutoClicker:
         print("Will click at current mouse position")
         
     def set_keys(self, *keys):
-        """
-        Set multiple keys to press simultaneously
-        Example: set_keys('a', 'shift', 'w')
-        """
+        """Set multiple keys to press simultaneously"""
         self.keys_to_press = list(keys)
         print(f"Keys set to: {self.keys_to_press}")
         
@@ -45,12 +44,12 @@ class AutoClicker:
         while self.running:
             try:
                 if self.use_current_position:
-                    # Click at current cursor position
                     self.mouse.click(Button.left, 1)
                 else:
-                    # Click at target coordinates
+                    current_pos = self.mouse.position
                     self.mouse.position = (self.target_x, self.target_y)
                     self.mouse.click(Button.left, 1)
+                    self.mouse.position = current_pos
                 
                 time.sleep(self.click_speed)
             except Exception as e:
@@ -75,45 +74,33 @@ class AutoClicker:
                 self.stop()
     
     def start(self, mode='click'):
-        """
-        Start the autoclicker
-        mode: 'click' for clicking, 'keys' for key pressing
-        """
+        """Start the autoclicker"""
         if self.running:
             print("Autoclicker is already running!")
             return
         
         self.running = True
-        print(f"Autoclicker started! ({mode} mode)")
-        print("Press 'esc' to stop")
+        print(f"\nAutoclicker started! ({mode} mode)")
+        print("Press 'ESC' to stop\n")
         
         if mode == 'click':
-            thread = threading.Thread(target=self.click_loop, daemon=True)
+            self.click_thread = threading.Thread(target=self.click_loop, daemon=False)
         elif mode == 'keys':
-            thread = threading.Thread(target=self.press_keys_loop, daemon=True)
+            self.click_thread = threading.Thread(target=self.press_keys_loop, daemon=False)
         else:
-            print("Invalid mode! Use 'click' or 'keys'")
+            print("Invalid mode!")
             self.running = False
             return
         
-        thread.start()
+        self.click_thread.start()
     
     def stop(self):
         """Stop the autoclicker"""
         if self.running:
             self.running = False
-            print("Autoclicker stopped!")
+            print("\nAutoclicker stopped!")
         else:
             print("Autoclicker is not running")
-    
-    def on_key_press(self, key):
-        """Handle global key press events"""
-        try:
-            if key == keyboard.Key.esc:
-                self.stop()
-                return False  # Stop listener
-        except AttributeError:
-            pass
 
 
 def print_menu():
@@ -151,11 +138,18 @@ def main():
     print("WELCOME TO AUTOCLICKER")
     print("="*50)
     print("Press 'ESC' at any time to stop the autoclicker")
-    print("Make sure to have the script window active or use a global listener")
+    print("="*50)
     
-    # Start a thread to listen for ESC key globally
+    # Start ESC key listener in background thread
     def listen_for_escape():
-        with Listener(on_press=autoclicker.on_key_press) as listener:
+        def on_press(key):
+            try:
+                if key == Key.esc:
+                    autoclicker.stop()
+            except AttributeError:
+                pass
+        
+        with Listener(on_press=on_press) as listener:
             listener.join()
     
     escape_thread = threading.Thread(target=listen_for_escape, daemon=True)
@@ -209,6 +203,7 @@ def main():
             get_current_position()
         
         elif choice == '9':
+            autoclicker.stop()
             print("Exiting autoclicker. Goodbye!")
             break
         
@@ -217,4 +212,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n\nAutoclicker closed.")
+        sys.exit(0)
