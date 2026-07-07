@@ -16,7 +16,6 @@ class AutoClicker:
         self.use_current_position = True
         self.keys_to_press = ['a']
         self.listener = None
-        self.click_thread = None
         
     def set_click_speed(self, speed):
         """Set clicking speed in seconds between clicks"""
@@ -81,26 +80,22 @@ class AutoClicker:
         
         self.running = True
         print(f"\nAutoclicker started! ({mode} mode)")
-        print("Press 'ESC' to stop\n")
+        print("Press 'ESC' to stop immediately\n")
         
         if mode == 'click':
-            self.click_thread = threading.Thread(target=self.click_loop, daemon=False)
+            thread = threading.Thread(target=self.click_loop, daemon=True)
         elif mode == 'keys':
-            self.click_thread = threading.Thread(target=self.press_keys_loop, daemon=False)
+            thread = threading.Thread(target=self.press_keys_loop, daemon=True)
         else:
             print("Invalid mode!")
             self.running = False
             return
         
-        self.click_thread.start()
+        thread.start()
     
     def stop(self):
         """Stop the autoclicker"""
-        if self.running:
-            self.running = False
-            print("\nAutoclicker stopped!")
-        else:
-            print("Autoclicker is not running")
+        self.running = False
 
 
 def print_menu():
@@ -137,83 +132,84 @@ def main():
     print("\n" + "="*50)
     print("WELCOME TO AUTOCLICKER")
     print("="*50)
-    print("Press 'ESC' at any time to stop the autoclicker")
+    print("ESC key stops the autoclicker instantly")
     print("="*50)
     
-    # Start ESC key listener in background thread
-    def listen_for_escape():
-        def on_press(key):
-            try:
-                if key == Key.esc:
-                    autoclicker.stop()
-            except AttributeError:
-                pass
-        
-        with Listener(on_press=on_press) as listener:
-            listener.join()
+    # Listen for ESC key globally
+    def on_press(key):
+        try:
+            if key == Key.esc:
+                autoclicker.stop()
+                print("ESC pressed - Autoclicker stopped!")
+        except AttributeError:
+            pass
     
-    escape_thread = threading.Thread(target=listen_for_escape, daemon=True)
-    escape_thread.start()
+    # Start global listener
+    listener = Listener(on_press=on_press)
+    listener.start()
     
-    while True:
-        print_menu()
-        choice = input("Enter your choice (1-9): ").strip()
-        
-        if choice == '1':
-            autoclicker.use_mouse_position()
-            autoclicker.start(mode='click')
-        
-        elif choice == '2':
-            try:
-                x = int(input("Enter X coordinate: "))
-                y = int(input("Enter Y coordinate: "))
-                autoclicker.set_target_coordinates(x, y)
+    try:
+        while True:
+            print_menu()
+            choice = input("Enter your choice (1-9): ").strip()
+            
+            if choice == '1':
+                autoclicker.use_mouse_position()
                 autoclicker.start(mode='click')
-            except ValueError:
-                print("Invalid input! Please enter numbers.")
-        
-        elif choice == '3':
-            autoclicker.start(mode='keys')
-        
-        elif choice == '4':
-            autoclicker.stop()
-        
-        elif choice == '5':
-            try:
-                speed = float(input("Enter click speed in seconds (e.g., 0.01 for 10ms): "))
-                autoclicker.set_click_speed(speed)
-                print(f"Click speed set to {speed} seconds")
-            except ValueError:
-                print("Invalid input! Please enter a number.")
-        
-        elif choice == '6':
-            keys_input = input("Enter keys separated by commas (e.g., 'a, shift, w'): ")
-            keys = [k.strip().lower() for k in keys_input.split(',')]
-            autoclicker.set_keys(*keys)
-        
-        elif choice == '7':
-            try:
-                x = int(input("Enter X coordinate: "))
-                y = int(input("Enter Y coordinate: "))
-                autoclicker.set_target_coordinates(x, y)
-            except ValueError:
-                print("Invalid input! Please enter numbers.")
-        
-        elif choice == '8':
-            get_current_position()
-        
-        elif choice == '9':
-            autoclicker.stop()
-            print("Exiting autoclicker. Goodbye!")
-            break
-        
-        else:
-            print("Invalid choice! Please try again.")
+            
+            elif choice == '2':
+                try:
+                    x = int(input("Enter X coordinate: "))
+                    y = int(input("Enter Y coordinate: "))
+                    autoclicker.set_target_coordinates(x, y)
+                    autoclicker.start(mode='click')
+                except ValueError:
+                    print("Invalid input! Please enter numbers.")
+            
+            elif choice == '3':
+                autoclicker.start(mode='keys')
+            
+            elif choice == '4':
+                autoclicker.stop()
+            
+            elif choice == '5':
+                try:
+                    speed = float(input("Enter click speed in seconds (e.g., 0.01 for 10ms): "))
+                    autoclicker.set_click_speed(speed)
+                    print(f"Click speed set to {speed} seconds")
+                except ValueError:
+                    print("Invalid input! Please enter a number.")
+            
+            elif choice == '6':
+                keys_input = input("Enter keys separated by commas (e.g., 'a, shift, w'): ")
+                keys = [k.strip().lower() for k in keys_input.split(',')]
+                autoclicker.set_keys(*keys)
+            
+            elif choice == '7':
+                try:
+                    x = int(input("Enter X coordinate: "))
+                    y = int(input("Enter Y coordinate: "))
+                    autoclicker.set_target_coordinates(x, y)
+                except ValueError:
+                    print("Invalid input! Please enter numbers.")
+            
+            elif choice == '8':
+                get_current_position()
+            
+            elif choice == '9':
+                autoclicker.stop()
+                print("Exiting autoclicker. Goodbye!")
+                break
+            
+            else:
+                print("Invalid choice! Please try again.")
+    
+    except KeyboardInterrupt:
+        print("\n\nAutoclicker closed.")
+    finally:
+        listener.stop()
+        sys.exit(0)
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        print("\n\nAutoclicker closed.")
-        sys.exit(0)
+    main()
